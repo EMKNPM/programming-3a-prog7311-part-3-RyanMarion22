@@ -1,0 +1,47 @@
+﻿@model TechMoveMVC.Models.ServiceRequest
+
+<div class="container mt-4">
+
+    <h2>Create Service Request</h2>
+
+    <div class="card bg-dark p-4">
+
+        <div asp-validation-summary="All" class="text-danger"></div>
+
+        <form asp-action="Create" method="post">
+
+            <div class="mb-3">
+                <label asp-for="ContractId" class="form-label text-light"></label>
+                <select asp-for="ContractId" asp-items="ViewBag.Contracts" class="form-control" required>
+                    <option value="">-- Select Contract --</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label text-light">Service Type</label>
+                <select name="serviceType" asp-items="ViewBag.ServiceTypes" class="form-control" required>
+                    <option value="">-- Select Type --</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Description" class="form-label text-light"></label>
+                <input asp-for="Description" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="CostUSD" class="form-label text-light"></label>
+                <input asp-for="CostUSD" class="form-control" />
+            </div>
+
+            <button type="submit" class="btn btn-outline-light">Create</button>
+
+        </form>
+
+    </div>
+
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

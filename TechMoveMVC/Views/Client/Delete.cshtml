@@ -1,0 +1,10 @@
+﻿@model TechMoveMVC.Models.Client
+
+<h2>Delete Client</h2>
+
+<p>Are you sure you want to delete @Model.Name?</p>
+
+<form asp-action="Delete">
+    <input type="hidden" asp-for="ClientId" />
+    <button class="btn btn-danger">Delete</button>
+</form>

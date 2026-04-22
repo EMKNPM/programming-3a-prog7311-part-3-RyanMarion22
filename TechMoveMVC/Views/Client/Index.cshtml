@@ -1,0 +1,32 @@
+﻿@model IEnumerable<TechMoveMVC.Models.Client>
+
+<div class="container mt-4">
+    <h2 class="mb-3">Clients</h2>
+    <a asp-action="Create" class="btn btn-outline-light mb-3">+ Add Client</a>
+    <div class="card bg-dark p-3">
+        <table class="table table-dark table-hover">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Contact</th>
+                    <th>Region</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    <tr>
+                        <td>@item.Name</td>
+                        <td>@item.ContactDetails</td>
+                        <td>@item.Region</td>
+                        <td>
+                            <a asp-action="Edit" asp-route-id="@item.ClientId" class="btn btn-warning btn-sm">Edit</a>
+                            <a asp-action="Delete" asp-route-id="@item.ClientId" class="btn btn-danger btn-sm">Delete</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
