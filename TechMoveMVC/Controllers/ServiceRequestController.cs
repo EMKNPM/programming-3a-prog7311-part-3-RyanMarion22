@@ -1,146 +1,109 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
-using TechMoveMVC.Data;
+using System.Net.Http.Json;
 using TechMoveMVC.Models;
-using TechMoveMVC.Services;
-using TechMoveMVC.Strategies;
-using TechMoveMVC.Factory;
 
 namespace TechMoveMVC.Controllers
 {
     public class ServiceRequestController : Controller
     {
-        private readonly AppDbContext _context;
-        private readonly CurrencyService _currencyService;
+        private readonly HttpClient _httpClient;
 
-        public ServiceRequestController(AppDbContext context, CurrencyService currencyService)
+        public ServiceRequestController(
+            IHttpClientFactory factory)
         {
-            _context = context;
-            _currencyService = currencyService;
+            _httpClient =
+                factory.CreateClient("TechMoveAPI");
         }
 
-        //  INDEX 
         public async Task<IActionResult> Index()
         {
-            var requests = await _context.ServiceRequests
-                .Include(r => r.Contract)
-                .ToListAsync();
+            var requests =
+                await _httpClient
+                .GetFromJsonAsync<List<ServiceRequest>>(
+                    "api/servicerequests");
 
             return View(requests);
         }
 
-        // CREATE 
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
-            LoadDropdowns();
+            var contracts =
+                await _httpClient
+                .GetFromJsonAsync<List<Contract>>(
+                    "api/contracts");
+
+            ViewBag.Contracts =
+                new SelectList(
+                    contracts,
+                    "ContractId",
+                    "ContractId");
+
+            ViewBag.ServiceTypes =
+                new SelectList(
+                    new List<string>
+                    {
+                        "Air",
+                        "Sea",
+                        "Road"
+                    });
+
             return View();
         }
 
         [HttpPost]
-        public async Task<IActionResult> Create(ServiceRequest request, string serviceType)
+        public async Task<IActionResult> Create(
+            ServiceRequest request)
         {
-            var contract = await _context.Contracts.FindAsync(request.ContractId);
-
-            if (contract == null)
-                ModelState.AddModelError("", "Invalid contract");
-
-            if (contract != null && (contract.Status == "Expired" || contract.Status == "OnHold"))
-                ModelState.AddModelError("", "Contract not active");
-
-            if (string.IsNullOrEmpty(serviceType))
-                ModelState.AddModelError("", "Select service type");
-
             if (!ModelState.IsValid)
-            {
-                LoadDropdowns();
                 return View(request);
-            }
 
-            var serviceRequest = ServiceRequestFactory.Create(serviceType);
-
-            serviceRequest.ContractId = request.ContractId;
-            serviceRequest.Description = request.Description;
-            serviceRequest.CostUSD = request.CostUSD;
-            serviceRequest.Status = "Pending";
-            serviceRequest.ServiceType = serviceType;
-
-            var currencyContext = new CurrencyContext();
-            currencyContext.SetStrategy(new USDStrategy(_currencyService));
-
-            serviceRequest.CostZAR = await currencyContext.Convert(request.CostUSD);
-
-            _context.ServiceRequests.Add(serviceRequest);
-            await _context.SaveChangesAsync();
+            await _httpClient.PostAsJsonAsync(
+                "api/servicerequests",
+                request);
 
             return RedirectToAction(nameof(Index));
         }
 
-        // EDIT 
-
         public async Task<IActionResult> Edit(int id)
         {
-            var request = await _context.ServiceRequests.FindAsync(id);
-            if (request == null) return NotFound();
+            var request =
+                await _httpClient
+                .GetFromJsonAsync<ServiceRequest>(
+                    $"api/servicerequests/{id}");
 
-            LoadDropdowns();
             return View(request);
         }
 
         [HttpPost]
-        public async Task<IActionResult> Edit(ServiceRequest request)
+        public async Task<IActionResult> Edit(
+            ServiceRequest request)
         {
-            if (!ModelState.IsValid)
-            {
-                LoadDropdowns();
-                return View(request);
-            }
-
-            _context.Update(request);
-            await _context.SaveChangesAsync();
+            await _httpClient.PutAsJsonAsync(
+                $"api/servicerequests/{request.ServiceRequestId}",
+                request);
 
             return RedirectToAction(nameof(Index));
         }
 
-        //  DELETE 
-
         public async Task<IActionResult> Delete(int id)
         {
-            var request = await _context.ServiceRequests
-                .Include(r => r.Contract)
-                .FirstOrDefaultAsync(r => r.ServiceRequestId == id);
-
-            if (request == null) return NotFound();
+            var request =
+                await _httpClient
+                .GetFromJsonAsync<ServiceRequest>(
+                    $"api/servicerequests/{id}");
 
             return View(request);
         }
 
         [HttpPost, ActionName("Delete")]
-        public async Task<IActionResult> DeleteConfirmed(int id)
+        public async Task<IActionResult> DeleteConfirmed(
+            int id)
         {
-            var request = await _context.ServiceRequests.FindAsync(id);
-
-            if (request != null)
-            {
-                _context.ServiceRequests.Remove(request);
-                await _context.SaveChangesAsync();
-            }
+            await _httpClient.DeleteAsync(
+                $"api/servicerequests/{id}");
 
             return RedirectToAction(nameof(Index));
-        }
-
-        //  HELPERS 
-
-        private void LoadDropdowns()
-        {
-            ViewBag.Contracts = new SelectList(_context.Contracts, "ContractId", "ContractId");
-
-            ViewBag.ServiceTypes = new SelectList(new List<string>
-            {
-                "Air",
-                "Sea",
-                "Road"
-            });
         }
     }
 }

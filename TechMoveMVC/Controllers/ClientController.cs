@@ -1,22 +1,28 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using TechMoveMVC.Data;
+using System.Net.Http.Json;
 using TechMoveMVC.Models;
 
 namespace TechMoveMVC.Controllers
 {
     public class ClientController : Controller
     {
-        private readonly AppDbContext _context;
+        private readonly HttpClient _httpClient;
 
-        public ClientController(AppDbContext context)
+        public ClientController(
+            IHttpClientFactory factory)
         {
-            _context = context;
+            _httpClient =
+                factory.CreateClient("TechMoveAPI");
         }
 
         public async Task<IActionResult> Index()
         {
-            return View(await _context.Clients.ToListAsync());
+            var clients =
+                await _httpClient
+                .GetFromJsonAsync<List<Client>>(
+                    "api/clients");
+
+            return View(clients);
         }
 
         public IActionResult Create()
@@ -30,18 +36,19 @@ namespace TechMoveMVC.Controllers
             if (!ModelState.IsValid)
                 return View(client);
 
-            _context.Add(client);
-            await _context.SaveChangesAsync();
+            await _httpClient.PostAsJsonAsync(
+                "api/clients",
+                client);
 
             return RedirectToAction(nameof(Index));
         }
 
-        //  EDIT 
-
         public async Task<IActionResult> Edit(int id)
         {
-            var client = await _context.Clients.FindAsync(id);
-            if (client == null) return NotFound();
+            var client =
+                await _httpClient
+                .GetFromJsonAsync<Client>(
+                    $"api/clients/{id}");
 
             return View(client);
         }
@@ -52,32 +59,29 @@ namespace TechMoveMVC.Controllers
             if (!ModelState.IsValid)
                 return View(client);
 
-            _context.Update(client);
-            await _context.SaveChangesAsync();
+            await _httpClient.PutAsJsonAsync(
+                $"api/clients/{client.ClientId}",
+                client);
 
             return RedirectToAction(nameof(Index));
         }
 
-        //  DELETE 
-
         public async Task<IActionResult> Delete(int id)
         {
-            var client = await _context.Clients.FindAsync(id);
-            if (client == null) return NotFound();
+            var client =
+                await _httpClient
+                .GetFromJsonAsync<Client>(
+                    $"api/clients/{id}");
 
             return View(client);
         }
 
         [HttpPost, ActionName("Delete")]
-        public async Task<IActionResult> DeleteConfirmed(int id)
+        public async Task<IActionResult> DeleteConfirmed(
+            int id)
         {
-            var client = await _context.Clients.FindAsync(id);
-
-            if (client != null)
-            {
-                _context.Clients.Remove(client);
-                await _context.SaveChangesAsync();
-            }
+            await _httpClient.DeleteAsync(
+                $"api/clients/{id}");
 
             return RedirectToAction(nameof(Index));
         }

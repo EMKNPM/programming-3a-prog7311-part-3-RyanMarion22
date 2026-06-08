@@ -1,137 +1,123 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
-using TechMoveMVC.Data;
+using System.Net.Http.Json;
 using TechMoveMVC.Models;
-using TechMoveMVC.Services;
 
 namespace TechMoveMVC.Controllers
 {
     public class ContractController : Controller
     {
-        private readonly AppDbContext _context;
+        private readonly HttpClient _httpClient;
 
-        public ContractController(AppDbContext context)
+        public ContractController(
+            IHttpClientFactory factory)
         {
-            _context = context;
+            _httpClient =
+                factory.CreateClient("TechMoveAPI");
         }
 
-        public async Task<IActionResult> Index(string status, DateTime? start, DateTime? end)
+        public async Task<IActionResult> Index()
         {
-            var contracts = _context.Contracts
-                .Include(c => c.Client)
-                .AsQueryable();
+            var contracts =
+                await _httpClient
+                .GetFromJsonAsync<List<Contract>>(
+                    "api/contracts");
 
-            if (!string.IsNullOrEmpty(status))
-                contracts = contracts.Where(c => c.Status == status);
-
-            if (start.HasValue)
-                contracts = contracts.Where(c => c.StartDate >= start);
-
-            if (end.HasValue)
-                contracts = contracts.Where(c => c.EndDate <= end);
-
-            return View(await contracts.ToListAsync());
+            return View(contracts);
         }
 
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
-            ViewBag.Clients = new SelectList(_context.Clients, "ClientId", "Name");
+            var clients =
+                await _httpClient
+                .GetFromJsonAsync<List<Client>>(
+                    "api/clients");
+
+            ViewBag.Clients =
+                new SelectList(
+                    clients,
+                    "ClientId",
+                    "Name");
+
             return View();
         }
 
         [HttpPost]
-        public async Task<IActionResult> Create(Contract contract, IFormFile file)
+        public async Task<IActionResult> Create(
+            Contract contract,
+            IFormFile file)
         {
-            var notifier = new NotificationService();
-            contract.Attach(notifier);
-
             if (!ModelState.IsValid)
-            {
-                ViewBag.Clients = new SelectList(_context.Clients, "ClientId", "Name");
                 return View(contract);
-            }
 
             if (file != null)
             {
-                if (Path.GetExtension(file.FileName).ToLower() != ".pdf")
-                {
-                    ModelState.AddModelError("", "Only PDF allowed");
-                    ViewBag.Clients = new SelectList(_context.Clients, "ClientId", "Name");
-                    return View(contract);
-                }
+                var fileName =
+                    Guid.NewGuid() + ".pdf";
 
-                var fileName = Guid.NewGuid() + ".pdf";
-                var folder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/files");
+                var folder =
+                    Path.Combine(
+                        Directory.GetCurrentDirectory(),
+                        "wwwroot/files");
 
-                if (!Directory.Exists(folder))
-                    Directory.CreateDirectory(folder);
+                Directory.CreateDirectory(folder);
 
-                var path = Path.Combine(folder, fileName);
+                var path =
+                    Path.Combine(folder, fileName);
 
-                using (var stream = new FileStream(path, FileMode.Create))
-                {
-                    await file.CopyToAsync(stream);
-                }
+                using var stream =
+                    new FileStream(path, FileMode.Create);
 
-                contract.FilePath = "/files/" + fileName;
+                await file.CopyToAsync(stream);
+
+                contract.FilePath =
+                    "/files/" + fileName;
             }
 
-            _context.Add(contract);
-            await _context.SaveChangesAsync();
+            await _httpClient.PostAsJsonAsync(
+                "api/contracts",
+                contract);
 
             return RedirectToAction(nameof(Index));
         }
 
-        // EDIT 
-
         public async Task<IActionResult> Edit(int id)
         {
-            var contract = await _context.Contracts.FindAsync(id);
-            if (contract == null) return NotFound();
+            var contract =
+                await _httpClient
+                .GetFromJsonAsync<Contract>(
+                    $"api/contracts/{id}");
 
-            ViewBag.Clients = new SelectList(_context.Clients, "ClientId", "Name", contract.ClientId);
             return View(contract);
         }
 
         [HttpPost]
-        public async Task<IActionResult> Edit(Contract contract)
+        public async Task<IActionResult> Edit(
+            Contract contract)
         {
-            if (!ModelState.IsValid)
-            {
-                ViewBag.Clients = new SelectList(_context.Clients, "ClientId", "Name", contract.ClientId);
-                return View(contract);
-            }
-
-            _context.Update(contract);
-            await _context.SaveChangesAsync();
+            await _httpClient.PutAsJsonAsync(
+                $"api/contracts/{contract.ContractId}",
+                contract);
 
             return RedirectToAction(nameof(Index));
         }
 
-        //  DELETE
-
         public async Task<IActionResult> Delete(int id)
         {
-            var contract = await _context.Contracts
-                .Include(c => c.Client)
-                .FirstOrDefaultAsync(c => c.ContractId == id);
-
-            if (contract == null) return NotFound();
+            var contract =
+                await _httpClient
+                .GetFromJsonAsync<Contract>(
+                    $"api/contracts/{id}");
 
             return View(contract);
         }
 
         [HttpPost, ActionName("Delete")]
-        public async Task<IActionResult> DeleteConfirmed(int id)
+        public async Task<IActionResult> DeleteConfirmed(
+            int id)
         {
-            var contract = await _context.Contracts.FindAsync(id);
-
-            if (contract != null)
-            {
-                _context.Contracts.Remove(contract);
-                await _context.SaveChangesAsync();
-            }
+            await _httpClient.DeleteAsync(
+                $"api/contracts/{id}");
 
             return RedirectToAction(nameof(Index));
         }
